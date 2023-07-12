@@ -50,7 +50,7 @@ pub struct AcyclicDependencyGraph<T> {
 
 impl<T> AcyclicDependencyGraph<T>
 where
-    T: Eq + Hash + Copy,
+    T: Eq + Hash + Clone,
 {
     /// Create a new empty graph.
     /// # Returns
@@ -81,7 +81,7 @@ where
         let mut leaves: HashSet<T> = HashSet::new();
         for node in &self.nodes {
             if self.forward_dependencies.get(&node).is_none() {
-                leaves.insert(*node);
+                leaves.insert(node.clone());
             }
         }
         return leaves;
@@ -94,7 +94,7 @@ where
         let mut roots: HashSet<T> = HashSet::new();
         for node in &self.nodes {
             if self.backward_dependencies.get(&node).is_none() {
-                roots.insert(*node);
+                roots.insert(node.clone());
             }
         }
         return roots;
@@ -108,23 +108,25 @@ where
     /// `Ok(())` if the dependency was added successfully.
     /// `Err(DependencyError::SelfReference)` if the dependency would create a self reference.
     /// `Err(DependencyError::CircularDependency)` if the dependency would create a circular dependency.
+    /// # Remarks
+    /// Takes ownership of the nodes.
     pub fn depend_on(&mut self, from: T, to: T) -> Result<(), DependencyError> {
         if from == to {
             return Err(DependencyError::SelfReference);
         }
-        if self.depends_on(to, from) {
+        if self.depends_on(&to, &from) {
             return Err(DependencyError::CircularDependency);
         }
 
         // ensure that nodes are accounted for in the graph
-        self.nodes.insert(from);
-        self.nodes.insert(to);
+        self.nodes.insert(from.clone());
+        self.nodes.insert(to.clone());
 
         // add the forward and backward dependency edges
         self.forward_dependencies
-            .entry(from)
+            .entry(from.clone())
             .or_insert(HashSet::new())
-            .insert(to);
+            .insert(to.clone());
         self.backward_dependencies
             .entry(to)
             .or_insert(HashSet::new())
@@ -140,8 +142,8 @@ where
     /// # Returns
     /// `true` if the source node depends on the target node.
     /// `false` if the source node does not depend on the target node.
-    pub fn depends_on(&self, source: T, target: T) -> bool {
-        self.get_forward_dependencies(source).contains(&target)
+    pub fn depends_on(&self, source: &T, target: &T) -> bool {
+        self.get_forward_dependencies(source).contains(target)
     }
 
     /// Get the set of nodes that a given node depends on.
@@ -149,12 +151,12 @@ where
     /// * `node` - The node to get the dependencies of.
     /// # Returns
     /// The set of nodes that the given node depends on.
-    pub fn get_forward_dependencies(&self, node: T) -> HashSet<T> {
+    pub fn get_forward_dependencies(&self, node: &T) -> HashSet<T> {
         let mut out = HashSet::new();
 
         let mut discovered = vec![node];
         while discovered.len() > 0 {
-            let mut discoveries: Vec<T> = Vec::new();
+            let mut discoveries = Vec::new();
             for node in discovered {
                 // get direct dependencies of the given node
                 let direct_dependencies: &HashSet<T> = match self.forward_dependencies.get(&node) {
@@ -164,8 +166,8 @@ where
 
                 // search the direct dependecies for newly discovered dependencies
                 for node in direct_dependencies {
-                    match out.insert(*node) {
-                        true => discoveries.push(*node),
+                    match out.insert(node.clone()) {
+                        true => discoveries.push(node),
                         false => continue,
                     }
                 }
@@ -181,12 +183,12 @@ where
     /// * `node` - The node to get the dependents of.
     /// # Returns
     /// The set of nodes that depend on the given node.
-    pub fn get_backward_dependencies(&self, node: T) -> HashSet<T> {
+    pub fn get_backward_dependencies(&self, node: &T) -> HashSet<T> {
         let mut out = HashSet::new();
 
         let mut discovered = vec![node];
         while discovered.len() > 0 {
-            let mut discoveries: Vec<T> = Vec::new();
+            let mut discoveries = Vec::new();
             for node in discovered {
                 // get direct dependencies of the given node
                 let direct_dependencies: &HashSet<T> = match self.backward_dependencies.get(&node) {
@@ -196,8 +198,8 @@ where
 
                 // search the direct dependecies for newly discovered dependencies
                 for node in direct_dependencies {
-                    match out.insert(*node) {
-                        true => discoveries.push(*node),
+                    match out.insert(node.clone()) {
+                        true => discoveries.push(node),
                         false => continue,
                     }
                 }
@@ -219,7 +221,7 @@ where
     /// The particular ordering of topological layers is not guaranteed.
     /// The only guarantee is that the nodes in each layer depend only on the nodes in the previous layers.
     pub fn get_forward_dependency_topological_layers(&self) -> Vec<HashSet<T>> {
-        let mut layers: Vec<HashSet<T>> = Vec::new();
+        let mut layers = Vec::new();
         let mut shrinking_graph = self.clone();
         loop {
             let leaves = shrinking_graph.get_leaves();
@@ -227,7 +229,7 @@ where
                 break;
             }
             for leaf in &leaves {
-                shrinking_graph.remove_node(*leaf);
+                shrinking_graph.remove_node(leaf.clone());
             }
             layers.push(leaves);
         }
@@ -245,7 +247,7 @@ where
     /// The particular ordering of topological layers is not guaranteed.
     /// The only guarantee is that the nodes in each layer are depended on only by the nodes in the previous layers.
     pub fn get_backward_dependency_topological_layers(&self) -> Vec<HashSet<T>> {
-        let mut layers: Vec<HashSet<T>> = Vec::new();
+        let mut layers = Vec::new();
         let mut shrinking_graph = self.clone();
         loop {
             let roots = shrinking_graph.get_roots();
@@ -253,7 +255,7 @@ where
                 break;
             }
             for root in &roots {
-                shrinking_graph.remove_node(*root);
+                shrinking_graph.remove_node(root.clone());
             }
             layers.push(roots);
         }
@@ -297,16 +299,17 @@ mod tests {
         // check forward and backward direct dependencies
         // note: we cannot guarantee any particular topological ordering so checking the direct dependencies is a second-best option
         let fwd_bckwd_check = |node: &str, expected_fwd: Vec<&str>, expected_bwd: Vec<&str>| {
-            let fwd = graph.get_forward_dependencies(node);
-            let bwd = graph.get_backward_dependencies(node);
+            let fwd = graph.get_forward_dependencies(&node);
+            let bwd = graph.get_backward_dependencies(&node);
 
             assert_eq!(fwd.len(), expected_fwd.len());
             assert_eq!(bwd.len(), expected_bwd.len());
             for expected_node in expected_fwd {
-                assert!(fwd.contains(expected_node));
+                assert!(fwd.contains(&expected_node));
             }
             for expected_node in expected_bwd {
-                assert!(bwd.contains(expected_node));
+                println!("expected_node: {}", &expected_node);
+                assert!(bwd.contains(&expected_node));
             }
         };
         fwd_bckwd_check(
