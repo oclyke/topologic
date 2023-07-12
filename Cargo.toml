@@ -1,6 +1,10 @@
 [package]
 name = "topologic"
 description = "Topological sorting of Acyclic Dependency Graphs"
+repository = "https://github.com/oclyke/topologic"
+readme = "README.md"
+keywords = ["DAG", "topological", "sort", "dependency", "graph"]
+categories = ["algorithms", "data-structures"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
