@@ -63,6 +63,14 @@ where
         }
     }
 
+    /// Check if the graph is empty.
+    /// # Returns
+    /// `true` if the graph is empty.
+    /// `false` if the graph is not empty.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
     /// Remove a node from the graph.
     /// # Arguments
     /// * `node` - The node to remove from the graph.
@@ -266,6 +274,19 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empty_graph_is_empty() {
+        let graph: AcyclicDependencyGraph<&str> = AcyclicDependencyGraph::new();
+        assert!(graph.is_empty());
+    }
+
+    #[test]
+    fn non_empty_graph_is_not_empty() {
+        let mut graph = AcyclicDependencyGraph::new();
+        graph.depend_on("a", "b").unwrap();
+        assert!(!graph.is_empty());
+    }
 
     #[test]
     fn self_referential_dependencies_detected() {
