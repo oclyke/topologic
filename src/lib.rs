@@ -7,6 +7,17 @@ pub enum DependencyError {
     CircularDependency,
 }
 
+impl std::fmt::Display for DependencyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DependencyError::SelfReference => write!(f, "Self reference"),
+            DependencyError::CircularDependency => write!(f, "Circular dependency"),
+        }
+    }
+}
+
+impl std::error::Error for DependencyError {}
+
 /// A map of direct dependencies.
 /// For a given node the value is the set of direct dependencies of that node.
 type DirectDependencyMap<T> = HashMap<T, HashSet<T>>;
